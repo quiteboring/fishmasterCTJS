@@ -1,0 +1,10 @@
+{
+    "name": "fishmaster",
+    "version": "1.0.0",
+    "entry": "index.js",
+    "description": "Fishmaster module for ChatTriggers",
+    "author": "",
+    "requires": [],
+    "ctVersion": "3.0.0",
+    "mcVersion": "1.21.8"
+}
