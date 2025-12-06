@@ -1,175 +1,37 @@
-const ArmorStandEntity = Java.type("net.minecraft.entity.decoration.ArmorStandEntity");
-const Iterable = Java.type("java.lang.Iterable");
+import { toggle, toggleDebug } from './features/autofish';
+import { getArmorStands } from './features/mixins';
+import { toggleDebug as toggleMouseDebug } from './features/mouseungrab';
 
-const CONFIG = {
-    recastDelay: 30,
-    reelingDelay: 5,
-    maxCastAttempts: 5,
-    randomization: 0.2,
-    debug: false
-};
+register("command", toggle).setName("autofish");
 
-let enabled = false;
-let state = "IDLE";
-let delayTimer = 0;
-let reelingTimer = 0;
-let castAttempts = 0;
-let lastCastTime = 0;
+register("command", toggleDebug).setName("fishdebug");
 
-const LeftClickMouse = Client.getMinecraft().getClass().getDeclaredMethod('method_1536');
-LeftClickMouse.setAccessible(true);
+register("command", toggleMouseDebug).setName("fishmousedebug");
 
-const RightClickMouse = Client.getMinecraft().getClass().getDeclaredMethod('method_1583');
-RightClickMouse.setAccessible(true);
-
-function debugMsg(msg) {
-    if (CONFIG.debug) {
-        ChatLib.chat("&7[Debug] &f" + msg);
-    }
-}
-
-function leftClick() {
-    const mc = Client.getMinecraft();
-    if (mc && mc.player) {
-        LeftClickMouse.invoke(mc);
-    }
-}
-
-function rightClick() {
-    const mc = Client.getMinecraft();
-    if (mc && mc.player) {
-        RightClickMouse.invoke(mc);
-    }
-}
-
-function getRandomDelay(base) {
-    const variance = base * CONFIG.randomization;
-    return Math.max(2, Math.round(base + (Math.random() * 2 - 1) * variance));
-}
-
-function hasBobberInWater() {
-    const player = Player.toMC();
-    if (!player) return false;
-    const bobber = player.fishHook;
-    return bobber && (bobber.isTouchingWater() || bobber.isInLava());
-}
-
-function isBobberInWater(bobber) {
-    return bobber && (bobber.isTouchingWater() || bobber.isInLava());
-}
-
-function detectFishBite() {
-    const mc = Client.getMinecraft();
-    const player = mc?.player;
-    const world = mc?.world;
-    
-    if (!player || !world || !hasBobberInWater()) {
-        return false;
-    }
-
-    
-    const allEntities = World.getAllEntities();
-    
-    for (let i = 0; i < allEntities.length; i++) {
-        const entity = allEntities[i];
-        const mcEntity = entity.toMC ? entity.toMC() : entity;
-        
-        if (mcEntity instanceof ArmorStandEntity) {
-            if (mcEntity.hasCustomName()) {
-                const customName = mcEntity.getCustomName();
-                if (customName) {
-                    const nameString = customName.getString();
-                    if (nameString === "!!!" || nameString.includes("!!!")) {
-                        const distance = mcEntity.squaredDistanceTo(player);
-                        if (distance <= 50 * 50) {
-                            return true;
-                        }
-                    }
-                }
+register("command", () => {
+    const stands = getArmorStands();
+    ChatLib.chat("&6[Fishmaster] &fScanning...");
+    let count = 0;
+    for (let i = 0; i < stands.length; i++) {
+        const stand = stands[i];
+        if (stand.hasCustomName()) {
+            const name = stand.getCustomName();
+            if (name) {
+                ChatLib.chat("&7  Found: '" + name.getString() + "'");
+                count++;
             }
         }
     }
-    return false;
-}
+    ChatLib.chat("&6[Fishmaster] &fFound " + count + " named armor stands.");
+}).setName("fishscan");
 
-function startCasting() {
-    rightClick();
-    state = "CASTING";
-    castAttempts++;
-    lastCastTime = Date.now();
-    delayTimer = 10;
-}
+register("command", () => {
+    ChatLib.chat("&6=== Fishmaster Commands ===");
+    ChatLib.chat("&e/autofish &7- Toggle autofish");
+    ChatLib.chat("&e/fishdebug &7- Toggle debug mode");
+    ChatLib.chat("&e/fishmousedebug &7- Toggle mouse debug");
+    ChatLib.chat("&e/fishscan &7- Scan armor stands");
+    ChatLib.chat("&e/fishhelp &7- Show this help");
+}).setName("fishhelp");
 
-function resetState() {
-    state = "IDLE";
-    delayTimer = 0;
-    reelingTimer = 0;
-    castAttempts = 0;
-}
-
-register('tick', () => {
-    if (!enabled || !World.isLoaded()) return;
-
-    if (delayTimer > 0) { delayTimer--; return; }
-    if (reelingTimer > 0) {
-        reelingTimer--;
-        if (reelingTimer <= 0) {
-            rightClick();
-            state = "IDLE";
-            delayTimer = getRandomDelay(CONFIG.recastDelay);
-        }
-        return;
-    }
-
-    const player = Player.toMC();
-    if (!player) return;
-
-    const bobber = player.fishHook;
-
-    switch (state) {
-        case "IDLE":
-            if (!bobber) {
-                startCasting();
-            } else if (isBobberInWater(bobber)) {
-                state = "FISHING";
-            }
-            break;
-
-        case "CASTING":
-            if (bobber && isBobberInWater(bobber)) {
-                state = "FISHING";
-                castAttempts = 0;
-            } else if (!bobber && Date.now() - lastCastTime > 2000) {
-                if (castAttempts < CONFIG.maxCastAttempts) {
-                    startCasting();
-                } else {
-                    enabled = false;
-                    resetState();
-                }
-            }
-            break;
-
-        case "FISHING":
-            if (!bobber) {
-                state = "IDLE";
-            } else if (detectFishBite()) {
-                reelingTimer = getRandomDelay(CONFIG.reelingDelay);
-            }
-            break;
-    }
-});
-
-function toggleAutofish() {
-    enabled = !enabled;
-    if (enabled) {
-        ChatLib.chat("&a[Fishmaster] &fAutofish &aenabled!");
-        resetState();
-    } else {
-        ChatLib.chat("&c[Fishmaster] &fAutofish &cdisabled!");
-        resetState();
-    }
-}
-
-register("command", toggleAutofish).setName("autofish");
-
-ChatLib.chat("&6[Fishmaster] &fLoaded! Use /autofish to toggle.");
+ChatLib.chat("&6[Fishmaster] &fLoaded! Use &e/autofish &fto toggle!.");
