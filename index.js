@@ -35,3 +35,22 @@ register("command", () => {
 }).setName("fishhelp");
 
 ChatLib.chat("&6[Fishmaster] &fLoaded! Use &e/autofish &fto toggle!.");
+
+
+// Remove if you want, this is just how to use.
+
+import { ungrabMouse, grabMouse } from './utils/ungrab';
+
+let ungrabbed = true;
+
+register("command", () => {
+    if (ungrabbed) {
+        grabMouse();
+        ChatLib.chat("&6[Fishmaster] &fMouse re-grabbed.");
+    } else {
+        ungrabMouse();
+        ChatLib.chat("&6[Fishmaster] &fMouse un-grabbed.");
+    }
+
+    ungrabbed = !ungrabbed
+}).setName("ungrab");

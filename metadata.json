@@ -2,6 +2,7 @@
     "name": "fishmaster",
     "version": "1.0.0",
     "entry": "index.js",
+    "mixinEntry": "mixinEntry.js",
     "description": "Fishmaster module for ChatTriggers",
     "author": "",
     "requires": [],
